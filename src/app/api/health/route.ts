@@ -1,0 +1,3 @@
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+export const runtime='nodejs';export async function GET(){let database='not_configured';try{await prisma.$queryRaw`SELECT 1`;database='ok';}catch{database=process.env.DATABASE_URL?'error':'not_configured';}return NextResponse.json({status:database==='ok'?'ok':'degraded',database,redisConfigured:Boolean(process.env.REDIS_URL),llmConfigured:Boolean(process.env.OPENAI_API_KEY),metaConfigured:Boolean(process.env.META_APP_SECRET&&process.env.META_WEBHOOK_VERIFY_TOKEN),timestamp:new Date().toISOString()},{status:database==='ok'?200:503,headers:{'Cache-Control':'no-store'}});}

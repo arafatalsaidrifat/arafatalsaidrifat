@@ -1,0 +1,7 @@
+import { z } from 'zod';
+import { prisma } from '@/lib/prisma';
+import { tenantContext,isResponse,writeAudit } from '@/lib/tenant';
+import { jsonError,noStoreJson } from '@/lib/http';
+export const runtime='nodejs';
+const schema=z.object({status:z.enum(['OPEN','PENDING','RESOLVED','HUMAN_REVIEW']).optional(),assignedToId:z.string().nullable().optional(),unread:z.boolean().optional()}).refine(x=>Object.keys(x).length>0);
+export async function PATCH(request:Request,route:{params:Promise<{id:string}>}){const t=await tenantContext(request);if(isResponse(t))return t;const {id}=await route.params;let raw;try{raw=await request.json();}catch{return jsonError('Invalid JSON.');}const p=schema.safeParse(raw);if(!p.success)return jsonError(p.error.issues[0]?.message??'Invalid change.');if(p.data.assignedToId){const member=await prisma.merchantMembership.findFirst({where:{merchantId:t.merchantId,userId:p.data.assignedToId}});if(!member)return jsonError('Assigned agent must be a member of this workspace.',400,'INVALID_ASSIGNEE');}const existing=await prisma.conversation.findFirst({where:{id,merchantId:t.merchantId}});if(!existing)return jsonError('Conversation not found in this workspace.',404,'NOT_FOUND');const updated=await prisma.conversation.update({where:{id},data:p.data as never,include:{customer:true,assignedTo:{select:{id:true,name:true}}}});await writeAudit({merchantId:t.merchantId,actorId:t.user.id,action:'conversation.updated',entityType:'Conversation',entityId:id,details:p.data});return noStoreJson({conversation:updated});}

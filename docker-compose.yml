@@ -1,0 +1,24 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fcommerce
+      POSTGRES_PASSWORD: fcommerce
+      POSTGRES_DB: fcommerce
+    ports: ["5432:5432"]
+    volumes: ["fcommerce_pg:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fcommerce -d fcommerce"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports: ["6379:6379"]
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: ["fcommerce_redis:/data"]
+volumes:
+  fcommerce_pg:
+  fcommerce_redis:

@@ -1,0 +1,30 @@
+name: CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      - run: npm run db:validate
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fcommerce?schema=public
+      - run: npm run db:generate
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fcommerce?schema=public
+      - run: npm run typecheck
+      - run: npm run build
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fcommerce?schema=public
+          BETTER_AUTH_SECRET: ci-only-secret-that-is-at-least-thirty-two-characters-long
+          BETTER_AUTH_URL: http://localhost:3000
+          APP_URL: http://localhost:3000
+          TOKEN_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
