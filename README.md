@@ -2,7 +2,9 @@
 
 F-Commerce OS is an operations workspace for Bangladesh social-commerce merchants. It brings customers, Messenger/Instagram/WhatsApp conversations, catalog/inventory, orders, manual/provider payment review, courier shipments, analytics, and an FAQ-grounded AI drafting workflow into one place. The platform defaults to BDT and `Asia/Dhaka`.
 
-This repository contains both the original browser-only exploration (`index.html`, `public/demo.html`) and a server-backed Next.js application (`src/`, `prisma/`). The demo is useful for product walkthroughs; the authenticated application is the foundation for connecting real provider accounts. Live external services are never inferred from sample records or configuration fields.
+The product is the server-backed Next.js application (`src/`, `prisma/`). The production UI reads and writes tenant-scoped PostgreSQL records through the authenticated server APIs; new workspaces start empty and connect external services only after the merchant authorizes them.
+
+**Release status:** this repository contains application foundations, not a production deployment or provider-approved SaaS. A deployment still needs a managed PostgreSQL instance, a public HTTPS host/domain, production secrets, reliable email delivery, backups/monitoring, and provider/legal approvals. See [PRODUCTION-READINESS.md](./PRODUCTION-READINESS.md) for the prioritized delivery plan, verified provider prerequisites, and explicit go-live gates.
 
 ## What's implemented in this repository
 
@@ -13,13 +15,13 @@ This repository contains both the original browser-only exploration (`index.html
 - Order creation computes money in integer poisha, validates same-merchant references and product stock, decrements inventory in a database transaction, creates a payment record and requires an `Idempotency-Key`.
 - Order status transitions are guarded; cancellation restores stock transactionally; marking as shipped requires a shipment booking.
 - Team membership and every tenant-aware API use server-verified session + merchant membership. This application does **not** depend on a client-provided merchant ID as authorization.
-- Optional repeatable demo seed for an existing authenticated user. Seeded merchant, conversations, payment references and tracking values are clearly labelled demo and provider accounts remain disconnected.
+- New workspaces are created by the signed-in owner and start without fabricated customer, order, payment, or provider records.
 
 ### Phase 2 — Meta channels
 
 - `GET/POST /api/webhooks/meta` supports Meta verification challenge and validates `X-Hub-Signature-256` against the exact raw body using constant-time comparison.
 - External message IDs are deduplicated, events are persisted before processing, and processing/send work is placed in a database outbox. Connected accounts are matched by provider account ID and merchant; unmapped events are recorded but never routed to a tenant.
-- Outbound Messenger/Instagram/WhatsApp sends require a configured connected channel, server-side encrypted token and valid graph API version. Message sends use a queue/outbox with retries; a local/demo status does not imply a provider send.
+- Outbound Messenger/Instagram/WhatsApp sends require a configured connected channel, server-side encrypted token and valid graph API version. Message sends use a queue/outbox with retries; a saved configuration does not imply a provider send.
 
 ### Phase 3 — AI support workflow
 
@@ -59,15 +61,18 @@ This repository contains both the original browser-only exploration (`index.html
 
 Requirements: Node.js 20.9+ (Node 22 LTS recommended), npm, and Docker Compose. The package registry must be reachable to install dependencies.
 
-1. **Install and start dependencies:**
+1. **Install and secure local dependencies:**
 
    ```bash
-   npm install
+   npm ci
    cp .env.example .env
+   openssl rand -hex 32  # use separate values for POSTGRES_PASSWORD and REDIS_PASSWORD
    docker compose up -d postgres redis
    ```
 
-2. **Generate secrets** (keep them out of Git and browser-side env vars):
+   Set the generated database passwords in `.env`, use those same values in `DATABASE_URL` and `REDIS_URL`, and keep the local services bound to loopback. These credentials are for local development only.
+
+2. **Generate application secrets** (keep them out of Git and browser-side env vars):
 
    ```bash
    openssl rand -base64 32  # use as BETTER_AUTH_SECRET
@@ -75,24 +80,20 @@ Requirements: Node.js 20.9+ (Node 22 LTS recommended), npm, and Docker Compose. 
    openssl rand -base64 36  # use as CRON_SECRET
    ```
 
-   Update `.env` with `DATABASE_URL`, `BETTER_AUTH_URL=http://localhost:3000`, `APP_URL=http://localhost:3000`, secrets, and `BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3000`. `ALLOW_PUBLIC_SIGNUP=true` is intended only for a controlled initial setup. Use a long password and turn off open registration once the first owner account exists.
+   Update `.env` with `DATABASE_URL`, `BETTER_AUTH_URL=http://localhost:3000`, `APP_URL=http://localhost:3000`, secrets, and `BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3000`. Set `ALLOW_PUBLIC_SIGNUP=true` only for controlled local onboarding with `RESEND_API_KEY` and `AUTH_EMAIL_FROM` configured. Production signup remains disabled until verified email, abuse protections, and an approved onboarding policy are in place.
 
 3. **Install schema and run the application:**
 
    ```bash
    npm run db:validate
    npm run db:generate
-   npm run db:push
+   npm run db:migrate:deploy
    npm run dev
    ```
 
-   Open `http://localhost:3000` and create the first user. For production, generate and review a migration in a controlled development database with `npm run db:migrate:init`, commit the resulting `prisma/migrations/` files, and apply them in production with `npm run db:migrate:deploy`. Do not use casual schema pushes against production.
+   Open `http://localhost:3000` and create a local user only after explicitly enabling signup and configuring account email. Deploy schema changes exclusively through reviewed, committed migrations with `npm run db:migrate:deploy`.
 
-4. **Seed a separate demo workspace (optional):**
-
-   After registering the intended owner, add `DEMO_OWNER_EMAIL=the-registered-email@example.com` to `.env`, then run `npm run db:seed`. The script never creates a predictable-password user; it attaches a clearly marked demo workspace to an existing user. Seed records use `DEMO-*` reference/tracking values, and no provider request is made.
-
-5. **Run checks:**
+4. **Run checks:**
 
    ```bash
    npm test
@@ -102,7 +103,21 @@ Requirements: Node.js 20.9+ (Node 22 LTS recommended), npm, and Docker Compose. 
    npm run build
    ```
 
-   `npm run worker` starts the optional BullMQ worker after Redis is configured. Without Redis, invoke the protected `/api/internal/worker` using the deployment's secret scheduler.
+   `npm run worker` starts the optional BullMQ worker after Redis is configured. Without Redis, invoke the protected `/api/internal/worker` using the deployment's secret scheduler. CI runs the same test, schema, type, lint, and build gates.
+
+## Production container
+
+Build a one-time migration image and the standalone Next.js image separately:
+
+```bash
+docker build --target migrator -t f-commerce-os-migrator:release .
+docker run --rm --env DATABASE_URL f-commerce-os-migrator:release
+docker build --target web -t f-commerce-os:release .
+```
+
+The migration task needs the production `DATABASE_URL` injected by the release environment. Run it once before rolling out web replicas; do not run migrations concurrently from web replicas. Configure the web container with `DATABASE_URL`, a unique `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `APP_URL`, trusted origins, `TOKEN_ENCRYPTION_KEY`, `RESEND_API_KEY`, and `AUTH_EMAIL_FROM` in the hosting platform's secret manager. Route HTTPS traffic through a managed ingress/load balancer. `/api/health` is a database-readiness check; do not expose its detailed dependency response publicly without an access policy.
+
+The container is a deployable application artifact, not a hosted service. Choose the owner-controlled registry, cloud, domain, managed PostgreSQL, email sender, private object storage and monitoring before exposing it to merchants. See [PRODUCTION-READINESS.md](./PRODUCTION-READINESS.md) for operational and provider release gates.
 
 ## Environment variables and integrations
 
@@ -110,7 +125,7 @@ All secrets are server environment variables. Never commit `.env`, paste provide
 
 | Variable group | Required values | Notes |
 |---|---|---|
-| Core database/auth | `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `APP_URL`, `TOKEN_ENCRYPTION_KEY` | The app deliberately returns setup/503 responses until auth/database configuration exists. Set trusted origins. |
+| Core database/auth/email | `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `APP_URL`, `TOKEN_ENCRYPTION_KEY`, `RESEND_API_KEY`, `AUTH_EMAIL_FROM` | Email/password sign-in needs the database and auth secrets. New-account registration additionally requires an email sender; verification and password recovery are delivered through Resend. Set trusted origins. |
 | Worker | `REDIS_URL` (optional), `CRON_SECRET` | Redis/BullMQ can accelerate worker handling; DB outbox persistence remains the fallback. |
 | Meta | `META_APP_SECRET`, `META_WEBHOOK_VERIFY_TOKEN`, `META_GRAPH_API_VERSION`, supported app/page/business credentials | App review, correct scopes, provider subscription, webhook verification, and end-to-end smoke testing are still required. Connect access tokens via the authenticated Integrations page; stored values are encrypted. |
 | LLM | `OPENAI_API_KEY`, optional `OPENAI_MODEL`, optional `OPENAI_BASE_URL` | The AI agent is a draft/review workflow, not an autonomous order/payment authority. Review provider privacy and retention terms. |

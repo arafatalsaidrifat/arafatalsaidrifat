@@ -4,16 +4,37 @@ on:
   pull_request:
 permissions:
   contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: fcommerce
+          POSTGRES_USER: fcommerce
+          POSTGRES_PASSWORD: fcommerce
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fcommerce -d fcommerce"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://fcommerce:fcommerce@localhost:5432/fcommerce?schema=public
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npm test
+      - run: npm run db:migrate:deploy
       - run: npm run db:validate
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fcommerce?schema=public
@@ -21,6 +42,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fcommerce?schema=public
       - run: npm run typecheck
+      - run: npm run lint
       - run: npm run build
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fcommerce?schema=public
@@ -28,3 +50,5 @@ jobs:
           BETTER_AUTH_URL: http://localhost:3000
           APP_URL: http://localhost:3000
           TOKEN_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      - run: docker build --target migrator -t f-commerce-os-migrator:ci .
+      - run: docker build --target web -t f-commerce-os:ci .

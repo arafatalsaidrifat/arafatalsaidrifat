@@ -72,7 +72,7 @@
 .top-icon:focus-visible,
 .control:focus-visible,
 a:focus-visible {
-  outline: 3px solid #59b8a7;
+  outline: 3px solid #b4233a;
   outline-offset: 3px;
 }
 
@@ -89,13 +89,13 @@ a:focus-visible {
 
 @media (hover: hover) and (pointer: fine) {
   .kpi-grid > .kpi:hover {
-    border-color: #c8ded9;
-    box-shadow: 0 14px 28px rgba(18, 36, 53, 0.09);
+    border-color: #edc8ce;
+    box-shadow: 0 14px 28px rgba(35, 18, 21, 0.09);
     transform: perspective(900px) translateY(-3px) rotateX(1deg);
   }
 
   .panel:hover {
-    border-color: #d7e1e5;
+    border-color: #e3d3d6;
   }
 }
 

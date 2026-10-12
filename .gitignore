@@ -8,3 +8,5 @@ out/
 coverage/
 .DS_Store
 prisma/generated/
+.vercel/
+*.tsbuildinfo

@@ -1,32 +1,31 @@
-# F-Commerce OS validation report
+# F-Commerce OS release validation
 
-Run date: 2026-10-12
+**Checked:** 12 October 2026
+**Scope:** current repository state in this workspace
 
-## Checks run in this workspace
+## Checks completed
 
-- `npm test`: **27 tests passed, 0 failed**; the standalone demo smoke test passed all **11 checks**.
-- `DATABASE_URL=postgresql://... npm run db:validate`: **passed**. Prisma schema validation does not connect to PostgreSQL.
-- `npm run typecheck`: **passed** with the installed project dependencies.
-- `DATABASE_URL=postgresql://... npm run build`: **passed**, including Prisma client generation, Next.js production compilation and build-time TypeScript checks.
-- `npm run lint`: **not clean**. ESLint reports 3 `react-hooks/set-state-in-effect` errors in `src/components/dashboard-client.tsx` and 5 warnings.
-- The dependency tree is present in this workspace and `package-lock.json` exists. A clean `npm ci` was not run, so registry/install reproducibility has not been verified.
+- `npm run verify`: **31 tests passed**, Prisma schema validation passed, TypeScript passed, ESLint passed, and the optimized Next.js production build passed.
+- The committed initial Prisma migration applied successfully to a new isolated PostgreSQL database and created 27 tables. Existing databases were not changed.
+- `npm ci` completed inside the production-image build. Both the migration and standalone web container targets built successfully.
+- The production web image was started as a non-root user on loopback against an isolated PostgreSQL database. The live HTTP checks returned database readiness **200**, sign-in page **200**, password recovery page **200**, and rejected registration while account-email setup was absent. The production Content Security Policy also permits only the external font hosts used by the stylesheet.
+- Docker Compose configuration parsed successfully when temporary required development passwords were supplied.
+- No application server or temporary database used for these checks was left running.
 
-## Remaining environment and release gates
+## Production launch is not complete
 
-- Local PostgreSQL and Redis are running from Docker Compose, and `npm run db:push` synchronized the development schema. This is not a reviewed production migration. No `.env` file is present, and the existing Next.js server was started without database configuration; its health endpoint reports `database: not_configured` (HTTP 503). Authenticated signup, seeded-database integration tests, queue-worker operation, and database-backed tenant tests remain unverified.
-- ESLint must be brought to zero errors before treating the repository lint gate as passed; the existing findings concern state reconciliation in effects.
-- The Vercel URL created earlier in the conversation serves the standalone HTML demonstration, not the complete Next.js API application. A subsequent Vercel inspection request returned a scope/permission error, so this report does not claim that the full API app is deployed or externally verified.
-- No Meta, OpenAI-compatible model, bKash, Nagad, Rocket, S3, Pathao, Steadfast, or Shiprocket credentials were supplied. Live provider actions are disabled until configured and approved.
+This workspace has no production `DATABASE_URL`, authentication/encryption secrets, domain, hosting project, verified email sender or Resend key, private object storage account, monitoring, or provider credentials. The container is a deployable artifact; it is not an internet-hosted service. Email delivery and provider onboarding were not exercised against owner-controlled accounts.
 
-## Recommended reproducible verification sequence
+Email verification and password recovery have code paths, but invitation lifecycle, MFA, account deletion, broad production abuse controls, privacy/retention operations, backups/restore drills, alerting, and independent security review remain release gates.
 
-1. Install Node.js 22 LTS and Docker, verify the committed manifest/lockfile pair with `npm ci`, and keep the resulting dependency graph pinned.
-2. Copy `.env.example` to `.env`, generate strong `BETTER_AUTH_SECRET`, `TOKEN_ENCRYPTION_KEY` (32-byte base64 or 64 hex) and `CRON_SECRET` values, and set a local PostgreSQL URL.
-3. Start local services with `docker compose up -d postgres redis`.
-4. Run `npm test`, `npm run db:validate`, `npm run db:generate`, `npm run typecheck`, `npm run lint`, and `npm run build`.
-5. Create and inspect a development migration with `npm run db:migrate:init`, commit the reviewed SQL, and use `npm run db:migrate:deploy` for a controlled deployment. Do not run `db:push` against production.
-6. Configure provider secrets in the hosting secret manager and test each integration in its approved sandbox before enabling live processing.
+Meta OAuth/Embedded Signup and marketplace authorization are not implemented. Provider adapters and configuration do not prove that an external account is connected or that a payment, message, or shipment has been accepted. Do not process real transactions until the owner/provider approvals and end-to-end checks in [PRODUCTION-READINESS.md](./PRODUCTION-READINESS.md) are complete.
 
-## Delivery boundary
+## Existing local services require separate care
 
-All six phases have source-code foundations, but this is **not yet a production-certified or live integrated system**. Passing local unit/smoke checks demonstrates only the behavior exercised by those checks. Complete dependency builds, database integration tests, provider contract tests, real-browser E2E tests, security review, backups, retention/privacy review, and operational monitoring remain release gates.
+The PostgreSQL and Redis containers already running in the shared workspace were observed listening on all host interfaces. The checked-in Compose file now binds new service instances to loopback and requires credentials, but editing Compose does not reconfigure or restart existing containers. They were left untouched to avoid disrupting shared services or persistent data. Before using them, an authorized operator should establish ownership, take and verify backups, rotate credentials, and deliberately recreate them with the restricted configuration.
+
+The checked-in first-install migration targets a new, empty database. A database previously synchronized directly from the Prisma schema must not receive that migration until its schema and migration history have been reviewed and safely baselined.
+
+## Commercial and legal boundary
+
+No deployment, hosting, provider approval, legal compliance, data-protection certification, or production support commitment is claimed. [LICENSE.txt](./LICENSE.txt) grants no open-source license; confirm code ownership, third-party licensing, and distribution rights before commercialization.
