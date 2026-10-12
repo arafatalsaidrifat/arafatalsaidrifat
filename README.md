@@ -125,7 +125,7 @@ All secrets are server environment variables. Never commit `.env`, paste provide
 
 This is a strong engineering foundation, not a certification or a claim that your provider accounts are active. Before using real orders:
 
-- Before production, install dependencies and commit the generated `package-lock.json`; then run `npm test`, `npm run db:validate`, `npm run db:generate`, `npm run typecheck`, `npm run lint`, `npm run build`, and a clean deployment build against that lockfile. This environment could not generate the lockfile because registry access timed out, so the packaged source intentionally does not claim a pinned dependency resolution.
+- Before production, verify that `package-lock.json` matches `package.json` and that a clean `npm ci` succeeds; then run `npm test`, `npm run db:validate`, `npm run db:generate`, `npm run typecheck`, `npm run lint`, `npm run build`, and a clean deployment build against that lockfile. A lockfile is present in this checkout, but clean-install reproducibility still needs verification.
 - Disable public self-registration or restrict it to invited users; configure email delivery and account recovery if needed; enable MFA/SSO at the appropriate tier.
 - Configure a production PostgreSQL cluster with backups/restore drills, TLS, least-privilege credentials, reviewed migrations and connection pooling appropriate to the hosting environment.
 - Configure private object storage lifecycle/retention and test signed URL access, tenant-bound object paths and deletion requests.

@@ -4,10 +4,12 @@ import { assertProviderUrl } from '@/lib/adapters/couriers/types';
 
 type FaqMatch={question:string;answer:string;score:number};
 type Policy={language:string;tone:string;shippingPolicy:string;paymentPolicy:string;returnPolicy:string;escalationTriggers:string[];minConfidence:number};
+// Defaulted channels need an explicit reducer; these keep the latest written value.
+const latest=<T>(_prev:T,next:T)=>next;
 const State=Annotation.Root({
-  merchantId:Annotation<string>(), question:Annotation<string>(), conversationId:Annotation<string|undefined>({default:()=>undefined}),
-  faqs:Annotation<FaqMatch[]>({default:()=>[]}), policy:Annotation<Policy>({default:()=>({language:'Bangla + Banglish',tone:'Warm and helpful',shippingPolicy:'',paymentPolicy:'',returnPolicy:'',escalationTriggers:[],minConfidence:.78})}),
-  answer:Annotation<string>({default:()=>''}), confidence:Annotation<number>({default:()=>0}), needsHuman:Annotation<boolean>({default:()=>false}), reason:Annotation<string>({default:()=>''})
+  merchantId:Annotation<string>(), question:Annotation<string>(), conversationId:Annotation<string|undefined>({reducer:latest,default:()=>undefined}),
+  faqs:Annotation<FaqMatch[]>({reducer:latest,default:()=>[]}), policy:Annotation<Policy>({reducer:latest,default:()=>({language:'Bangla + Banglish',tone:'Warm and helpful',shippingPolicy:'',paymentPolicy:'',returnPolicy:'',escalationTriggers:[],minConfidence:.78})}),
+  answer:Annotation<string>({reducer:latest,default:()=>''}), confidence:Annotation<number>({reducer:latest,default:()=>0}), needsHuman:Annotation<boolean>({reducer:latest,default:()=>false}), reason:Annotation<string>({reducer:latest,default:()=>''})
 });
 function norm(s:string){return s.toLocaleLowerCase().normalize('NFKC').replace(/[^\p{L}\p{N}\s]/gu,' ').replace(/\s+/g,' ').trim();}
 function scoreFaq(question:string,faq:string){const q=new Set(norm(question).split(' ').filter(x=>x.length>1));const f=new Set(norm(faq).split(' ').filter(x=>x.length>1));if(!q.size||!f.size)return 0;let shared=0;for(const word of q)if(f.has(word))shared++;return shared/Math.max(q.size,1);}

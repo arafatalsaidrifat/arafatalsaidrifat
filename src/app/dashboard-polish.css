@@ -1,0 +1,121 @@
+@keyframes workspace-enter {
+  from {
+    opacity: 0;
+    transform: translateY(9px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-header {
+  animation: workspace-enter 420ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.setup-card,
+.auth-card {
+  animation: workspace-enter 460ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.page-header h1 {
+  text-wrap: balance;
+}
+
+.page-header p {
+  max-width: 68ch;
+  line-height: 1.6;
+}
+
+.kpi-grid > .kpi {
+  animation: workspace-enter 460ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 220ms ease;
+}
+
+.kpi-grid > .kpi:nth-child(2) {
+  animation-delay: 45ms;
+}
+
+.kpi-grid > .kpi:nth-child(3) {
+  animation-delay: 90ms;
+}
+
+.kpi-grid > .kpi:nth-child(4) {
+  animation-delay: 135ms;
+}
+
+.kpi-grid > .kpi:nth-child(5) {
+  animation-delay: 180ms;
+}
+
+.kpi-grid > .kpi:nth-child(6) {
+  animation-delay: 225ms;
+}
+
+.panel {
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.btn,
+.nav-btn,
+.top-icon {
+  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.btn:active {
+  transform: translateY(1px) scale(0.985);
+}
+
+.btn:focus-visible,
+.nav-btn:focus-visible,
+.top-icon:focus-visible,
+.control:focus-visible,
+a:focus-visible {
+  outline: 3px solid #59b8a7;
+  outline-offset: 3px;
+}
+
+.table-wrap,
+.chat-list,
+.chat-messages {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-wrap {
+  touch-action: pan-x pan-y;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .kpi-grid > .kpi:hover {
+    border-color: #c8ded9;
+    box-shadow: 0 14px 28px rgba(18, 36, 53, 0.09);
+    transform: perspective(900px) translateY(-3px) rotateX(1deg);
+  }
+
+  .panel:hover {
+    border-color: #d7e1e5;
+  }
+}
+
+@media (max-width: 760px) {
+  .table-wrap {
+    scrollbar-width: thin;
+  }
+
+  .page-header p {
+    line-height: 1.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
