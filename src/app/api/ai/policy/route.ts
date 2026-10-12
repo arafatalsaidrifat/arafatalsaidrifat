@@ -1,0 +1,8 @@
+import { z } from 'zod';
+import { prisma } from '@/lib/prisma';
+import { tenantContext,isResponse,writeAudit } from '@/lib/tenant';
+import { jsonError,noStoreJson } from '@/lib/http';
+export const runtime='nodejs';
+const schema=z.object({enabled:z.boolean().optional(),language:z.enum(['Bangla + Banglish','Bangla','English']).optional(),tone:z.string().trim().min(2).max(80).optional(),shippingPolicy:z.string().max(4000).optional(),paymentPolicy:z.string().max(4000).optional(),returnPolicy:z.string().max(4000).optional(),escalationTriggers:z.array(z.string().trim().min(1).max(80)).max(30).optional(),minConfidence:z.number().min(0.5).max(1).optional()});
+export async function GET(request:Request){const t=await tenantContext(request);if(isResponse(t))return t;const policy=await prisma.aiPolicy.findUnique({where:{merchantId:t.merchantId}});const faqs=await prisma.aiFaq.findMany({where:{merchantId:t.merchantId},orderBy:{createdAt:'asc'}});return noStoreJson({policy,faqs,mode:process.env.OPENAI_API_KEY?'langgraph_with_llm':'langgraph_rules_fallback'});}
+export async function PUT(request:Request){const t=await tenantContext(request,['OWNER','ADMIN']);if(isResponse(t))return t;let raw;try{raw=await request.json();}catch{return jsonError('Invalid JSON.');}const p=schema.safeParse(raw);if(!p.success||!Object.keys(p.data??{}).length)return jsonError(p.error?.issues[0]?.message??'Provide at least one policy field.');const policy=await prisma.aiPolicy.upsert({where:{merchantId:t.merchantId},update:p.data as never,create:{merchantId:t.merchantId,...p.data}});await writeAudit({merchantId:t.merchantId,actorId:t.user.id,action:'ai.policy_updated',entityType:'AiPolicy',entityId:policy.id});return noStoreJson({policy});}

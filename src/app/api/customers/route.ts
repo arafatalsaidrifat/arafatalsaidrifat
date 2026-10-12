@@ -1,0 +1,8 @@
+import { z } from 'zod';
+import { prisma } from '@/lib/prisma';
+import { tenantContext,isResponse,writeAudit } from '@/lib/tenant';
+import { jsonError,noStoreJson } from '@/lib/http';
+export const runtime='nodejs';
+const schema=z.object({name:z.string().trim().min(2).max(150),phone:z.string().trim().min(8).max(25).optional(),city:z.string().trim().max(100).optional(),address:z.string().trim().max(500).optional(),email:z.string().email().optional(),notes:z.string().max(2000).optional()});
+export async function GET(request:Request){const t=await tenantContext(request);if(isResponse(t))return t;const q=new URL(request.url).searchParams.get('q')?.trim();const customers=await prisma.customer.findMany({where:{merchantId:t.merchantId,...(q?{OR:[{name:{contains:q,mode:'insensitive'}},{phone:{contains:q}}]}:{})},include:{_count:{select:{orders:true,conversations:true}}},orderBy:{updatedAt:'desc'},take:200});return noStoreJson({customers:customers.map(({_count,...c})=>({...c,orderCount:_count.orders,conversationCount:_count.conversations}))});}
+export async function POST(request:Request){const t=await tenantContext(request,['OWNER','ADMIN','AGENT']);if(isResponse(t))return t;let raw;try{raw=await request.json();}catch{return jsonError('Invalid JSON.');}const p=schema.safeParse(raw);if(!p.success)return jsonError(p.error.issues[0]?.message??'Invalid customer.');const customer=await prisma.customer.create({data:{merchantId:t.merchantId,...p.data}});await writeAudit({merchantId:t.merchantId,actorId:t.user.id,action:'customer.created',entityType:'Customer',entityId:customer.id});return noStoreJson({customer},201);}
