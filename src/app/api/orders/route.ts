@@ -77,7 +77,7 @@ export async function POST(request: Request) {
         if (product.stockQuantity < item.quantity) throw new Error(`INSUFFICIENT_STOCK:${product.name}`);
         const lineTotalPaisa = product.sellPricePaisa * item.quantity;
         if (!Number.isSafeInteger(lineTotalPaisa)) throw new Error('ORDER_TOTAL_UNSAFE');
-        return { productId: product.id, productName: product.name, sku: product.sku, quantity: item.quantity, unitPricePaisa: product.sellPricePaisa, lineTotalPaisa };
+        return { merchantId: ctx.merchantId, productId: product.id, productName: product.name, sku: product.sku, quantity: item.quantity, unitPricePaisa: product.sellPricePaisa, lineTotalPaisa };
       });
       const shippingPaisa = shippingFeePaisa(p.data.shippingCity, merchant.insideDhakaPaisa, merchant.outsideDhakaPaisa);
       const totals = calculateOrderTotal({ items, discountPaisa: p.data.discountPaisa, shippingPaisa });

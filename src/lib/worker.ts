@@ -112,6 +112,8 @@ export async function handleOutboxJob(id: string) {
       const conversationId = String(payload.conversationId);
       const messageId = String(payload.messageId);
       const messageText = String(payload.text);
+      // Messages are always merchant-scoped; never look one up without a merchant filter.
+      if (!job.merchantId) throw new MetaPermanentDeliveryError('Queued message job has no merchant workspace.');
       const message = await prisma.message.findFirst({ where: { id: messageId, merchantId: job.merchantId } });
       if (!message) throw new MetaPermanentDeliveryError('Queued message was not found in its merchant workspace.');
       // A retry after a crash must never resend a message which was already acknowledged or whose outcome is unknown.
@@ -170,7 +172,7 @@ export async function handleOutboxJob(id: string) {
     if (job.type === 'PROCESS_META_EVENT' && payload.webhookEventId) {
       await prisma.webhookEvent.updateMany({ where: { id: String(payload.webhookEventId), status: { not: 'PROCESSED' } }, data: { status: exhausted ? 'FAILED' : 'QUEUED', errorCode: 'PROCESSING_FAILED', errorDetail: message.slice(0, 500) } });
     }
-    if (job.type === 'SEND_META_MESSAGE' && payload.messageId) {
+    if (job.type === 'SEND_META_MESSAGE' && payload.messageId && job.merchantId) {
       // Never overwrite a previously persisted SENT status if only the final outbox update failed.
       const current = await prisma.message.findFirst({ where: { id: String(payload.messageId), merchantId: job.merchantId }, select: { deliveryStatus: true } });
       if (current?.deliveryStatus !== 'SENT') await prisma.message.updateMany({ where: { id: String(payload.messageId), merchantId: job.merchantId, deliveryStatus: { notIn: ['SENT', 'UNKNOWN'] } }, data: { deliveryStatus: uncertain ? 'UNKNOWN' : stopRetry ? 'FAILED' : 'RETRYABLE' } });
